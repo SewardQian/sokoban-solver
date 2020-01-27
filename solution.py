@@ -21,8 +21,7 @@ def sokoban_goal_state(state):
     return True
 
 
-def heur_manhattan_distance(state):
-    # IMPLEMENT
+def heur_manhattan_distance(state: SokobanState):
     """admissible sokoban puzzle heuristic: manhattan distance
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
@@ -31,7 +30,17 @@ def heur_manhattan_distance(state):
     # stored and the storage point nearest to it is such a heuristic. When calculating distances, assume there are no
     # obstacles on the grid. You should implement this heuristic function exactly, even if it is tempting to improve
     # it. Your function should return a numeric value; this is the estimate of the distance to the goal.
-    return 0
+    total = 0
+    for box in state.boxes:
+        target = min(state.storage, key=lambda x: calc_manhattan(box, x))
+        total += calc_manhattan(box, target)
+
+    return total
+
+
+def calc_manhattan(p1, p2):
+    """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
 
 # SOKOBAN HEURISTICS
@@ -104,3 +113,10 @@ def anytime_gbfs(initial_state, heur_fn, timebound=10):
 
     # IMPLEMENT
     return False
+
+
+if __name__ == "__main__":
+
+    for p in PROBLEMS[0:4]:
+        print(heur_manhattan_distance(p))
+        print(p.state_string())
