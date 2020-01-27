@@ -9,8 +9,10 @@
 import os  # for time functions
 from search import *  # for search engines
 from sokoban import SokobanState, Direction, PROBLEMS  # for Sokoban specific classes and problems
+from sokoban import UP, DOWN, LEFT, RIGHT
 
 
+# ================================================= Utilities ======================================================
 def sokoban_goal_state(state):
     """
   @return: Whether all boxes are stored.
@@ -21,15 +23,56 @@ def sokoban_goal_state(state):
     return True
 
 
+def calc_manhattan(p1, p2):
+    """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
+    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+
+
+def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
+    return (pos[0] + dir.delta[0], pos[1] + dir.delta[1]) in state.obstacles
+
+def box_in_dir(pos, dir: Direction, state: SokobanState):
+    return (pos[0] + dir.delta[0], pos[1] + dir.delta[1]) in state.boxes
+
+def opp_dir(dir: Direction):
+    return Direction("opposite " + dir.name, (-dir.delta[0], -dir.delta[1]))
+
+
+def movable(box, state: SokobanState):
+    ob_left = obsticle_in_dir(box, LEFT, state)
+    ob_right = obsticle_in_dir(box, RIGHT, state)
+    ob_up = obsticle_in_dir(box, UP, state)
+    ob_down = obsticle_in_dir(box, DOWN, state)
+
+    return not (
+            (ob_down and ob_right) or
+            (ob_down and ob_left) or
+            (ob_left and ob_up) or
+            (ob_up and ob_right)
+    )
+
+
+def pushable_dirs(box, state: SokobanState):
+    ob_left = obsticle_in_dir(box, LEFT, state) or box_in_dir(box, LEFT, state)
+    ob_right = obsticle_in_dir(box, RIGHT, state) or box_in_dir(box, RIGHT, state)
+    ob_up = obsticle_in_dir(box, UP, state) or box_in_dir(box, UP, state)
+    ob_down = obsticle_in_dir(box, DOWN, state) or box_in_dir(box, DOWN, state)
+    dirs = []
+
+    if not ob_left and not ob_right:
+        dirs += LEFT
+        dirs += RIGHT
+    if not ob_up and not ob_down:
+        dirs += LEFT
+        dirs += RIGHT
+    return dirs
+
+# ================================================= Heuristics =====================================================
 def heur_manhattan_distance(state: SokobanState):
     """admissible sokoban puzzle heuristic: manhattan distance
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
-    # We want an admissible heuristic, which is an optimistic heuristic. It must never overestimate the cost to get
-    # from the current state to the goal. The sum of the Manhattan distances between each box that has yet to be
-    # stored and the storage point nearest to it is such a heuristic. When calculating distances, assume there are no
-    # obstacles on the grid. You should implement this heuristic function exactly, even if it is tempting to improve
-    # it. Your function should return a numeric value; this is the estimate of the distance to the goal.
+
     total = 0
     for box in state.boxes:
         target = min(state.storage, key=lambda x: calc_manhattan(box, x))
@@ -38,12 +81,19 @@ def heur_manhattan_distance(state: SokobanState):
     return total
 
 
-def calc_manhattan(p1, p2):
-    """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
-    return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+def heur_alternate(state: SokobanState):
+    """a better heuristic
+    INPUT: a sokoban state
+    OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
+
+    for box in state.boxes:
+        # if box is in unmovable position and not on a storage position
+        if not movable(box, state) and box not in state.storage:
+            return 9999999999999
+
+    return heur_manhattan_distance(state)
 
 
-# SOKOBAN HEURISTICS
 def trivial_heuristic(state):
     """trivial admissible sokoban heuristic
     INPUT: a sokoban state
@@ -56,23 +106,12 @@ def trivial_heuristic(state):
     return count
 
 
-def heur_alternate(state):
-    """a better heuristic
-    INPUT: a sokoban state
-    OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
-
-    # IMPLEMENT
-
-    # heur_manhattan_distance has flaws. Write a heuristic function that improves upon heur_manhattan_distance to
-    # estimate distance between the current state and the goal. Your function should return a numeric value for the
-    # estimate of the distance to the goal.
-    return 0
-
-
 def heur_zero(state):
     """Zero Heuristic can be used to make A* search perform uniform cost search"""
     return 0
 
+
+# ================================================ Anytime Algorithms ================================================
 
 def fval_function(sN, weight):
     """
