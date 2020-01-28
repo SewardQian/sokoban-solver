@@ -29,10 +29,10 @@ def calc_manhattan(p1, p2):
 
 
 def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
-    return (pos[0] + dir.delta[0], pos[1] + dir.delta[1]) in state.obstacles
+    return dir.move(pos) in state.obstacles
 
 def box_in_dir(pos, dir: Direction, state: SokobanState):
-    return (pos[0] + dir.delta[0], pos[1] + dir.delta[1]) in state.boxes
+    return dir.move(pos) in state.boxes
 
 def opp_dir(dir: Direction):
     return Direction("opposite " + dir.name, (-dir.delta[0], -dir.delta[1]))
@@ -86,12 +86,27 @@ def heur_alternate(state: SokobanState):
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
 
-    for box in state.boxes:
-        # if box is in unmovable position and not on a storage position
-        if not movable(box, state) and box not in state.storage:
-            return 9999999999999
+    total = 0
 
-    return heur_manhattan_distance(state)
+    moved_robot = None
+    # prioritise states that move the same robot as their parent
+    if state.parent is not None and state.parent.parent is not None:
+        # get which robot moved from previous state to this one
+        for i in range(len(state.robots)):
+            if state.robots[i] is not state.parent.robots[i]:
+                moved_robot = i
+                break
+        # if current moved robot is different from the robot previous state moved
+        if state.parent.robots[moved_robot] is state.parent.parent.robots[moved_robot]:
+            total += 100
+
+    # calculate distance from each robot to each box if box is not in storage and add to estimation
+    for box in state.boxes:
+        if box not in state.storage:
+            target = state.robots[moved_robot] if moved_robot is not None else min(state.robots, key=lambda x: calc_manhattan(box, x))
+            total += calc_manhattan(box, target)
+
+    return total + heur_manhattan_distance(state)
 
 
 def trivial_heuristic(state):
@@ -155,7 +170,12 @@ def anytime_gbfs(initial_state, heur_fn, timebound=10):
 
 
 if __name__ == "__main__":
+    s0 = PROBLEMS[5]
+    print(s0.state_string())
 
-    for p in PROBLEMS[0:4]:
-        print(heur_manhattan_distance(p))
-        print(p.state_string())
+    se = SearchEngine('best_first', 'full')
+    se.trace_on()
+
+    se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
+
+    final = se.search()
