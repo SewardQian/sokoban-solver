@@ -10,7 +10,7 @@ import os  # for time functions
 from search import *  # for search engines
 from sokoban import SokobanState, Direction, PROBLEMS  # for Sokoban specific classes and problems
 from sokoban import UP, DOWN, LEFT, RIGHT
-
+import heapq
 
 # ================================================= Utilities ======================================================
 def sokoban_goal_state(state):
@@ -27,6 +27,11 @@ def calc_manhattan(p1, p2):
     """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
+def calc_manhattan_ls(p1s, p2s):
+    total = 0
+    for p1 in p1s:
+        total += calc_manhattan(p1,min(p2s, key=lambda x: calc_manhattan(p1, x)))
+    return total
 
 def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
     return dir.move(pos) in state.obstacles
@@ -80,12 +85,27 @@ def heur_manhattan_distance(state: SokobanState):
 
     return total
 
+def heur_smart_manhattan(state: SokobanState):
+    ls = [[]]*len(state.boxes)
 
-def heur_alternate(state: SokobanState):
-    """a better heuristic
-    INPUT: a sokoban state
-    OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
+    for s, stor in enumerate(state.storage):
+        for b, box in enumerate(state.boxes):
+            heapq.heappush(ls[b], (s, calc_manhattan(box, stor)))
 
+    total = 0
+    filled = set()
+    for heap in ls:
+
+        while True:
+            closest = heapq.heappop(heap)
+            if closest[0] not in filled:
+                filled.add(closest[0])
+                total += closest[1]
+                break
+
+    return total
+
+def heur_spaghetti(state: SokobanState):
     total = 0
 
     moved_robot = None
@@ -96,17 +116,32 @@ def heur_alternate(state: SokobanState):
             if state.robots[i] is not state.parent.robots[i]:
                 moved_robot = i
                 break
-        # if current moved robot is different from the robot previous state moved
-        if state.parent.robots[moved_robot] is state.parent.parent.robots[moved_robot]:
+
+        # don't use current state if current moved robot is different from the robot previous state moved
+        if state.parent.robots[moved_robot] is not state.parent.parent.robots[moved_robot]:
             total += 100
 
-    # calculate distance from each robot to each box if box is not in storage and add to estimation
+    # if box is not in storage, calculate distance from current robot to each box and add to estimation
+    # if current robot is none calculate distance to nearest robot for each box
     for box in state.boxes:
-        if box not in state.storage:
-            target = state.robots[moved_robot] if moved_robot is not None else min(state.robots, key=lambda x: calc_manhattan(box, x))
+        if not movable(box, state):
+            total += 999
+        elif box not in state.storage:
+            target = state.robots[moved_robot] if moved_robot is not None \
+                                               else min(state.robots, key=lambda x: calc_manhattan(box, x))
             total += calc_manhattan(box, target)
 
     return total + heur_manhattan_distance(state)
+
+def heur_idk(state: SokobanState):
+    return calc_manhattan_ls(state.storage, state.boxes) + calc_manhattan_ls(state.robots, state.boxes) - len(state.boxes)
+
+def heur_alternate(state: SokobanState):
+    """a better heuristic
+    INPUT: a sokoban state
+    OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
+
+    return heur_idk(state)
 
 
 def trivial_heuristic(state):
