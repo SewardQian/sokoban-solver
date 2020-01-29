@@ -12,6 +12,7 @@ from sokoban import SokobanState, Direction, PROBLEMS  # for Sokoban specific cl
 from sokoban import UP, DOWN, LEFT, RIGHT
 import heapq
 
+
 # ================================================= Utilities ======================================================
 def sokoban_goal_state(state):
     """
@@ -27,17 +28,26 @@ def calc_manhattan(p1, p2):
     """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
+
 def calc_manhattan_ls(p1s, p2s):
     total = 0
     for p1 in p1s:
-        total += calc_manhattan(p1,min(p2s, key=lambda x: calc_manhattan(p1, x)))
+        total += calc_manhattan(p1, min(p2s, key=lambda x: calc_manhattan(p1, x)))
     return total
+
+
+# returns tuple representing signed x and y distance from p1 to p2
+def calc_manhattan_tup(p1, p2):
+    return p2[0] - p1[0], p2[1] - p1[1], calc_manhattan(p1, p2)
+
 
 def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
     return dir.move(pos) in state.obstacles
 
+
 def box_in_dir(pos, dir: Direction, state: SokobanState):
     return dir.move(pos) in state.boxes
+
 
 def opp_dir(dir: Direction):
     return Direction("opposite " + dir.name, (-dir.delta[0], -dir.delta[1]))
@@ -72,6 +82,7 @@ def pushable_dirs(box, state: SokobanState):
         dirs += RIGHT
     return dirs
 
+
 # ================================================= Heuristics =====================================================
 def heur_manhattan_distance(state: SokobanState):
     """admissible sokoban puzzle heuristic: manhattan distance
@@ -85,8 +96,9 @@ def heur_manhattan_distance(state: SokobanState):
 
     return total
 
+
 def heur_smart_manhattan(state: SokobanState):
-    ls = [[]]*len(state.boxes)
+    ls = [[]] * len(state.boxes)
 
     for s, stor in enumerate(state.storage):
         for b, box in enumerate(state.boxes):
@@ -104,6 +116,7 @@ def heur_smart_manhattan(state: SokobanState):
                 break
 
     return total
+
 
 def heur_spaghetti(state: SokobanState):
     total = 0
@@ -128,20 +141,83 @@ def heur_spaghetti(state: SokobanState):
             total += 999
         elif box not in state.storage:
             target = state.robots[moved_robot] if moved_robot is not None \
-                                               else min(state.robots, key=lambda x: calc_manhattan(box, x))
+                else min(state.robots, key=lambda x: calc_manhattan(box, x))
             total += calc_manhattan(box, target)
 
     return total + heur_manhattan_distance(state)
 
+
 def heur_idk(state: SokobanState):
-    return calc_manhattan_ls(state.storage, state.boxes) + calc_manhattan_ls(state.robots, state.boxes) - len(state.boxes)
+    return 2 * calc_manhattan_ls(state.storage, state.boxes) + calc_manhattan_ls(state.robots,
+                                                                                 state.boxes)  # - len(state.boxes)
+
+
+# each robot looks at nearest box and calculate
+def heur_smart_robots(state: SokobanState):
+    total = 0
+
+    for box in state.boxes:
+        if box in state.storage:
+            continue
+        box_tup = calc_manhattan_tup(box, min(state.storage, key=lambda x: calc_manhattan(box, x)))
+        closest_robot = min(state.robots, key=lambda x: calc_manhattan(box, x))
+
+        # what positions does robot have to move to to move box in correct direction?
+        target_pos = [None, None]
+        if box_tup[0] < 0:  # if box wants to go left, robot needs to move to right of box
+            target_pos[0] = RIGHT.move(box)
+        elif box_tup[0] > 0:
+            target_pos[0] = LEFT.move(box)
+        if box_tup[1] < 0:  # if box wants to go up, robot needs to move to below box
+            target_pos[1] = DOWN.move(box)
+        elif box_tup[1] > 0:
+            target_pos[1] = UP.move(box)
+
+        total += box_tup[2]  # box needs to move to storage
+
+        if target_pos[0] is not None and target_pos[1] is not None:
+            total += min(calc_manhattan(closest_robot, target_pos[0]), calc_manhattan(closest_robot, target_pos[1])) + 2
+
+        # box is in same y pos as storage, so just x needs to change (target has same y pos as box)
+        elif target_pos[0] is not None:
+
+            total += calc_manhattan(closest_robot, target_pos[0])
+
+            # if robot is on same y pos as target (and box), and the box is between the robot and the target,
+            # need to move around the box so add 2
+            if closest_robot[1] == target_pos[0][1] and \
+                    (target_pos[0][0] < box[0] < closest_robot[0] or
+                     closest_robot[0] < box[0] < target_pos[0][0]):
+                total += 2
+
+        # box is in same x pos as storage, so just y needs to change (target has same x pos as box
+        elif target_pos[1] is not None:
+
+            total += calc_manhattan(closest_robot, target_pos[1])
+
+            # if robot is on same x pos as target (and box), and the box is between the robot and the target,
+            # need to move around the box so add 2
+            if closest_robot[1] == target_pos[1][0] and \
+                    (target_pos[1][1] < box[1] < closest_robot[1] or
+                     closest_robot[1] < box[1] < target_pos[1][1]):
+                total += 2
+        else:
+            # at least one of target_pos [0] and [1] is not None otherwise box in storage and would have been skipped
+            assert False
+
+    return total
+
 
 def heur_alternate(state: SokobanState):
     """a better heuristic
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
 
-    return heur_idk(state)
+    for box in state.boxes:
+        if not movable(box, state):
+            return 9999999
+
+    return heur_smart_robots(state)
 
 
 def trivial_heuristic(state):

@@ -2,6 +2,24 @@
 from solution import *
 from sokoban import sokoban_goal_state
 
+
+def my_print_path(end: SokobanState):
+    s = end
+    states = []
+    while s:
+        states.append(s)
+        s = s.parent
+    print()
+    states.pop().print_state()
+    while states:
+        s = states.pop()
+        print(" ==> ", end="")
+        print(f"ACTION was {s.action}")
+        print(f"Estimated cost was {heur_alternate(s)}")
+        print(s.state_string())
+    print("")
+
+
 # Select what to test
 test_manhattan = False
 test_fval_function = False
@@ -62,6 +80,7 @@ if test_alternate:
 
         s0 = PROBLEMS[i]  # Problems get harder as i gets bigger
         print(s0.state_string())
+        print(f"Estimated cost is {heur_alternate(s0)}")
 
         se = SearchEngine('best_first', 'full')
         se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
@@ -69,6 +88,7 @@ if test_alternate:
 
         if final:
             # final.print_path()
+            my_print_path(final)
             solved += 1
         else:
             unsolved.append(i)
