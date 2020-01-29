@@ -38,7 +38,7 @@ def calc_manhattan_ls(p1s, p2s):
 
 # returns tuple representing signed x and y distance from p1 to p2
 def calc_manhattan_tup(p1, p2):
-    return p2[0] - p1[0], p2[1] - p1[1], calc_manhattan(p1, p2)
+    return p2[0] - p1[0], p2[1] - p1[1]
 
 
 def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
@@ -157,23 +157,27 @@ def heur_smart_robots(state: SokobanState):
     total = 0
 
     for box in state.boxes:
+        # if box is in storage already, assume it adds no cost and go to next box
         if box in state.storage:
             continue
-        box_tup = calc_manhattan_tup(box, min(state.storage, key=lambda x: calc_manhattan(box, x)))
+
+        # calculate distance and direction box needs to move, and find closest robot to move box
+        box_signed_dst = calc_manhattan_tup(box, min(state.storage, key=lambda x: calc_manhattan(box, x)))
         closest_robot = min(state.robots, key=lambda x: calc_manhattan(box, x))
 
-        # what positions does robot have to move to to move box in correct direction?
+        # find positions robot would need to move to to move box in correct directions
         target_pos = [None, None]
-        if box_tup[0] < 0:  # if box wants to go left, robot needs to move to right of box
+        if box_signed_dst[0] < 0:  # if box wants to go left, robot needs to move to right of box
             target_pos[0] = RIGHT.move(box)
-        elif box_tup[0] > 0:
+        elif box_signed_dst[0] > 0:
             target_pos[0] = LEFT.move(box)
-        if box_tup[1] < 0:  # if box wants to go up, robot needs to move to below box
+        if box_signed_dst[1] < 0:  # if box wants to go up, robot needs to move to below box
             target_pos[1] = DOWN.move(box)
-        elif box_tup[1] > 0:
+        elif box_signed_dst[1] > 0:
             target_pos[1] = UP.move(box)
 
-        total += box_tup[2]  # box needs to move to storage
+        # box needs to move to storage position, so add movement cost to total
+        total += abs(box_signed_dst[0]) + abs(box_signed_dst[1])
 
         if target_pos[0] is not None and target_pos[1] is not None:
             total += min(calc_manhattan(closest_robot, target_pos[0]), calc_manhattan(closest_robot, target_pos[1])) + 2
@@ -207,14 +211,15 @@ def heur_smart_robots(state: SokobanState):
 
     return total
 
-
+times_called = [0]
 def heur_alternate(state: SokobanState):
     """a better heuristic
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
-
+    global times_called
+    times_called[0] += 1
     for box in state.boxes:
-        if not movable(box, state):
+        if box not in state.storage and not movable(box, state):
             return 9999999
 
     return heur_smart_robots(state)

@@ -15,8 +15,9 @@ def my_print_path(end: SokobanState):
         s = states.pop()
         print(" ==> ", end="")
         print(f"ACTION was {s.action}")
-        print(f"Estimated cost was {heur_alternate(s)}")
         print(s.state_string())
+        print(f"Estimated cost was {heur_alternate(s)}")
+
     print("")
 
 
@@ -82,10 +83,11 @@ if test_alternate:
         print(s0.state_string())
         print(f"Estimated cost is {heur_alternate(s0)}")
 
+        times_called[0] = 0
         se = SearchEngine('best_first', 'full')
         se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
         final = se.search(timebound)
-
+        print(f"heuristic was called {times_called[0]} times")
         if final:
             # final.print_path()
             my_print_path(final)
