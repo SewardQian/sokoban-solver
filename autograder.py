@@ -15,8 +15,8 @@ def my_print_path(end: SokobanState):
         s = states.pop()
         print(" ==> ", end="")
         print(f"ACTION was {s.action}")
-        print(s.state_string())
         print(f"Estimated cost was {heur_alternate(s)}")
+        print(s.state_string())
 
     print("")
 

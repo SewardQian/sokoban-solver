@@ -1,0 +1,122 @@
+# def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
+#     return dir.move(pos) in state.obstacles
+#
+#
+# def box_in_dir(pos, dir: Direction, state: SokobanState):
+#     return dir.move(pos) in state.boxes
+#
+#
+# def get_box_in_dir(pos, dir: Direction, state: SokobanState):
+#     return dir.move(pos) if box_in_dir(pos, dir, state) else None
+#
+#
+# def object_in_dir(pos, dir: Direction, state: SokobanState):
+#     new_pos = dir.move(pos)
+#     return (new_pos in state.obstacles or new_pos in state.boxes
+#             or new_pos[0] < 0
+#             or new_pos[0] >= state.width
+#             or new_pos[1] < 0
+#             or new_pos[1] >= state.height)
+#
+#
+# def opp_dir(dir: Direction):
+#     return Direction("opposite " + dir.name, (-dir.delta[0], -dir.delta[1]))
+#
+#
+# def currently_movable(box, state: SokobanState):
+#     ob_left = object_in_dir(box, LEFT, state)
+#     ob_right = object_in_dir(box, RIGHT, state)
+#     ob_up = object_in_dir(box, UP, state)
+#     ob_down = object_in_dir(box, DOWN, state)
+#
+#     return not (
+#             (ob_down and ob_right) or
+#             (ob_down and ob_left) or
+#             (ob_left and ob_up) or
+#             (ob_up and ob_right)
+#     )
+#
+#
+# def ever_movable(box, state: SokobanState):
+#     return em(box, state, {box})
+#
+#
+# def em(box, state: SokobanState, visited: set):
+#     if box is None:
+#         return False
+#
+#     if box not in visited:
+#         if not currently_movable(box, state):
+#             ob_left, b_left = object_in_dir(box, LEFT, state), get_box_in_dir(box, LEFT, state)
+#             ob_right, b_right = object_in_dir(box, RIGHT, state), get_box_in_dir(box, RIGHT, state)
+#             ob_up, b_up = object_in_dir(box, UP, state), get_box_in_dir(box, UP, state)
+#             ob_down, b_down = object_in_dir(box, DOWN, state), get_box_in_dir(box, DOWN, state)
+#
+#             if ob_down and ob_right and not (em(b_down, state, {box}) or em(b_right, state, {box})):
+#                 return False
+#             if ob_down and ob_left and not (em(b_down, state, {box}) or em(b_left, state, {box})):
+#                 return False
+#             if ob_left and ob_up and not (em(b_left, state, {box}) or em(b_up, state, {box})):
+#                 return False
+#             if ob_up and ob_right and not (em(b_up, state, {box}) or em(b_right, state, {box})):
+#                 return False
+#
+#         return True
+#
+#
+# def pushable_dirs(box, state: SokobanState):
+#     ob_left = obsticle_in_dir(box, LEFT, state) or box_in_dir(box, LEFT, state)
+#     ob_right = obsticle_in_dir(box, RIGHT, state) or box_in_dir(box, RIGHT, state)
+#     ob_up = obsticle_in_dir(box, UP, state) or box_in_dir(box, UP, state)
+#     ob_down = obsticle_in_dir(box, DOWN, state) or box_in_dir(box, DOWN, state)
+#     dirs = []
+#
+#     if not ob_left and not ob_right:
+#         dirs += LEFT
+#         dirs += RIGHT
+#     if not ob_up and not ob_down:
+#         dirs += LEFT
+#         dirs += RIGHT
+#     return dirs
+
+# def heur_idk(state: SokobanState):
+#    return 2 * calc_manhattan_ls(state.storage, state.boxes) + calc_manhattan_ls(state.robots,
+#                                                                                 state.boxes)  # - len(state.boxes)
+
+
+# def heur_spaghetti(state: SokobanState):
+#     total = 0
+#
+#     moved_robot = None
+#     # prioritise states that move the same robot as their parent
+#     if state.parent is not None and state.parent.parent is not None:
+#         # get which robot moved from previous state to this one
+#         for i in range(len(state.robots)):
+#             if state.robots[i] is not state.parent.robots[i]:
+#                 moved_robot = i
+#                 break
+#
+#         # don't use current state if current moved robot is different from the robot previous state moved
+#         if state.parent.robots[moved_robot] is not state.parent.parent.robots[moved_robot]:
+#             total += 100
+#
+#     # if box is not in storage, calculate distance from current robot to each box and add to estimation
+#     # if current robot is none calculate distance to nearest robot for each box
+#     for box in state.boxes:
+#         if not movable(box, state):
+#             total += 999
+#         elif box not in state.storage:
+#             target = state.robots[moved_robot] if moved_robot is not None \
+#                 else min(state.robots, key=lambda x: calc_manhattan(box, x))
+#             total += calc_manhattan(box, target)
+#
+#     return total + heur_manhattan_distance(state)
+
+
+#
+# def calc_manhattan_ls(p1s, p2s):
+#     total = 0
+#     for p1 in p1s:
+#         total += calc_manhattan(p1, min(p2s, key=lambda x: calc_manhattan(p1, x)))
+#     return total
+

@@ -28,59 +28,42 @@ def calc_manhattan(p1, p2):
     """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
-
-def calc_manhattan_ls(p1s, p2s):
-    total = 0
-    for p1 in p1s:
-        total += calc_manhattan(p1, min(p2s, key=lambda x: calc_manhattan(p1, x)))
-    return total
-
-
-# returns tuple representing signed x and y distance from p1 to p2
 def calc_manhattan_tup(p1, p2):
+    """returns tuple representing signed x and y distance from p1 to p2"""
     return p2[0] - p1[0], p2[1] - p1[1]
 
 
-def obsticle_in_dir(pos, dir: Direction, state: SokobanState):
-    return dir.move(pos) in state.obstacles
+def is_dead_state(state: SokobanState):
+    """returns whether the given state is dead, i.e a solution is never possible from the given state"""
+    # a state is dead if any box is in an unmovable position and not on a storage position
+    for box in state.boxes:
+        if box not in state.storage and dead(box, state, set()):
+            return True
+    return False
 
+def is_oob(pos, state: SokobanState):
+    """returns whether a given position is out of bounds"""
+    return not (0 <= pos[0] < state.width and 0 <= pos[1] < state.height)
 
-def box_in_dir(pos, dir: Direction, state: SokobanState):
-    return dir.move(pos) in state.boxes
+def dead(pos, state: SokobanState, visited: set):
+    """
+        returns whether a given (x,y) position is dead (unmovable)
+        a position is dead if it is an obsticle (or boundry), or a box cornered by two dead positions
+    """
+    # if the position is an obstacle or boundry it is dead
+    # if this pos is already in visited then there is a box at this position that is deadlocked with another box
+    if pos in state.obstacles or is_oob(pos, state) or pos in visited:
+        return True
+    elif pos not in state.boxes:  # not an obsticle or box, then position is not dead
+        return False
 
+    corners = [(DOWN, LEFT), (LEFT, UP), (UP, RIGHT), (RIGHT, DOWN)]
+    visited.add(pos)
 
-def opp_dir(dir: Direction):
-    return Direction("opposite " + dir.name, (-dir.delta[0], -dir.delta[1]))
-
-
-def movable(box, state: SokobanState):
-    ob_left = obsticle_in_dir(box, LEFT, state)
-    ob_right = obsticle_in_dir(box, RIGHT, state)
-    ob_up = obsticle_in_dir(box, UP, state)
-    ob_down = obsticle_in_dir(box, DOWN, state)
-
-    return not (
-            (ob_down and ob_right) or
-            (ob_down and ob_left) or
-            (ob_left and ob_up) or
-            (ob_up and ob_right)
-    )
-
-
-def pushable_dirs(box, state: SokobanState):
-    ob_left = obsticle_in_dir(box, LEFT, state) or box_in_dir(box, LEFT, state)
-    ob_right = obsticle_in_dir(box, RIGHT, state) or box_in_dir(box, RIGHT, state)
-    ob_up = obsticle_in_dir(box, UP, state) or box_in_dir(box, UP, state)
-    ob_down = obsticle_in_dir(box, DOWN, state) or box_in_dir(box, DOWN, state)
-    dirs = []
-
-    if not ob_left and not ob_right:
-        dirs += LEFT
-        dirs += RIGHT
-    if not ob_up and not ob_down:
-        dirs += LEFT
-        dirs += RIGHT
-    return dirs
+    for d1, d2 in corners:
+        if dead(d1.move(pos), state, visited) and dead(d2.move(pos), state, visited):
+            return True
+    return False
 
 
 # ================================================= Heuristics =====================================================
@@ -116,40 +99,6 @@ def heur_smart_manhattan(state: SokobanState):
                 break
 
     return total
-
-
-def heur_spaghetti(state: SokobanState):
-    total = 0
-
-    moved_robot = None
-    # prioritise states that move the same robot as their parent
-    if state.parent is not None and state.parent.parent is not None:
-        # get which robot moved from previous state to this one
-        for i in range(len(state.robots)):
-            if state.robots[i] is not state.parent.robots[i]:
-                moved_robot = i
-                break
-
-        # don't use current state if current moved robot is different from the robot previous state moved
-        if state.parent.robots[moved_robot] is not state.parent.parent.robots[moved_robot]:
-            total += 100
-
-    # if box is not in storage, calculate distance from current robot to each box and add to estimation
-    # if current robot is none calculate distance to nearest robot for each box
-    for box in state.boxes:
-        if not movable(box, state):
-            total += 999
-        elif box not in state.storage:
-            target = state.robots[moved_robot] if moved_robot is not None \
-                else min(state.robots, key=lambda x: calc_manhattan(box, x))
-            total += calc_manhattan(box, target)
-
-    return total + heur_manhattan_distance(state)
-
-
-def heur_idk(state: SokobanState):
-    return 2 * calc_manhattan_ls(state.storage, state.boxes) + calc_manhattan_ls(state.robots,
-                                                                                 state.boxes)  # - len(state.boxes)
 
 
 # each robot looks at nearest box and calculate
@@ -211,6 +160,7 @@ def heur_smart_robots(state: SokobanState):
 
     return total
 
+
 times_called = [0]
 def heur_alternate(state: SokobanState):
     """a better heuristic
@@ -218,9 +168,11 @@ def heur_alternate(state: SokobanState):
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
     global times_called
     times_called[0] += 1
-    for box in state.boxes:
-        if box not in state.storage and not movable(box, state):
-            return 9999999
+    # if times_called[0] > 100000:
+    #     state.print_state()
+
+    if is_dead_state(state):
+        return 99999999999
 
     return heur_smart_robots(state)
 
