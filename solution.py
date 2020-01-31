@@ -28,6 +28,7 @@ def calc_manhattan(p1, p2):
     """calculates manhattan distance between two points (x1, y1) and (x2, y2)"""
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
+
 def calc_manhattan_tup(p1, p2):
     """returns tuple representing signed x and y distance from p1 to p2"""
     return p2[0] - p1[0], p2[1] - p1[1]
@@ -37,20 +38,26 @@ def is_dead_state(state: SokobanState):
     """returns whether the given state is dead, i.e a solution is never possible from the given state"""
     # a state is dead if any box is in an unmovable position and not on a storage position
     for box in state.boxes:
-        if box not in state.storage and dead(box, state, set()):
+        if box not in state.storage and (is_immovable(box, state) or is_stuck(box, state)):
             return True
     return False
+
 
 def is_oob(pos, state: SokobanState):
     """returns whether a given position is out of bounds"""
     return not (0 <= pos[0] < state.width and 0 <= pos[1] < state.height)
 
-def dead(pos, state: SokobanState, visited: set):
+
+def is_immovable(pos, state):
     """
-        returns whether a given (x,y) position is dead (unmovable)
-        a position is dead if it is an obsticle (or boundry), or a box cornered by two dead positions
+            returns whether a given (x,y) position is immovable
+            a position is immovable if it is an obsticle (or boundry), or a box cornered by two immovable positions
     """
-    # if the position is an obstacle or boundry it is dead
+    return _is_immov(pos, state, set())
+
+
+def _is_immov(pos, state: SokobanState, visited: set):
+    # if the position is an obstacle or boundry it is immovable
     # if this pos is already in visited then there is a box at this position that is deadlocked with another box
     if pos in state.obstacles or is_oob(pos, state) or pos in visited:
         return True
@@ -61,9 +68,110 @@ def dead(pos, state: SokobanState, visited: set):
     visited.add(pos)
 
     for d1, d2 in corners:
-        if dead(d1.move(pos), state, visited) and dead(d2.move(pos), state, visited):
+        if _is_immov(d1.move(pos), state, visited) and _is_immov(d2.move(pos), state, visited):
             return True
     return False
+
+
+def is_stuck(box, state: SokobanState):
+    """
+        returns whether a box is stuck against a wall with no storage position
+        this is the case when a box is in a situation like this:
+
+        #    $    #
+         #########
+
+        where $ is the box and # is *any* immovable position
+        (can be oriented in any way and the bottom wall can be any length)
+
+        **** ASSUMES BOX IS MOVABLE ****
+    """
+
+    # wall dir is direction of wall from box
+    for wall_dir in (UP, DOWN, LEFT, RIGHT):
+
+        found_plus_edge, found_minus_edge = False, False
+        plus_pos, minus_pos = box, box
+        plus_dir, minus_dir = cw_dir(wall_dir), ccw_dir(wall_dir)
+
+        while not found_plus_edge:
+
+            if plus_pos in state.storage or not is_immovable(wall_dir.move(plus_pos), state):
+                return False
+            else:
+                if is_immovable(plus_pos, state):
+                    found_plus_edge = True
+
+            plus_pos = plus_dir.move(plus_pos)
+
+        while not found_minus_edge:
+
+            if minus_pos in state.storage or not is_immovable(wall_dir.move(minus_pos), state):
+                return False
+            else:
+                if is_immovable(minus_pos, state):
+                    found_minus_edge = True
+
+            minus_pos = minus_dir.move(minus_pos)
+
+        return found_plus_edge and found_minus_edge
+
+        # while (box[0] + i < state.width and box[1]  < state.height
+        #        and not found_plus_edge and not found_minus_edge):
+        #
+        #     if not found_plus_edge:
+        #         plus_wall = tadd(box, tmul(i, wall_dir.delta))
+        #         if plus_wall in state.storage:
+        #             return False
+        #         if is_immovable(plus_wall, state):
+        #             found_plus_edge = True
+        #
+        #     if not found_minus_edge:
+        #         minus_pos = tadd(box, tmul(-i, wall_dir.delta))
+        #         if minus_pos in state.storage:
+        #             return False
+        #         if is_immovable(minus_pos, state):
+        #             pass
+        #
+        #     i += 1
+
+
+def cw_dir(dir: Direction):
+    """returns the next direction in the sequence UP RIGHT DOWN LEFT UP ..."""
+    if dir is UP:
+        return RIGHT
+    elif dir is RIGHT:
+        return DOWN
+    elif dir is DOWN:
+        return LEFT
+    elif dir is LEFT:
+        return UP
+    else:
+        assert False
+
+
+def ccw_dir(dir: Direction):
+    """returns the next direction in the sequence UP LEFT DOWN RIGHT UP ..."""
+    if dir is UP:
+        return LEFT
+    elif dir is LEFT:
+        return DOWN
+    elif dir is DOWN:
+        return RIGHT
+    elif dir is RIGHT:
+        return UP
+    else:
+        assert False
+
+
+def tadd(tup1, tup2):
+    """for some two tuples, returns a new tuple where each index i is tup1[i] + tup2[i]"""
+    return tuple([i + j for i, j in zip(tup1, tup2)])
+
+
+def tmul(i, tup):
+    """for some tuple, returns a tuple where each index is multiplied by i"""
+    return tuple([j * i for j in tup])
 
 
 # ================================================= Heuristics =====================================================
@@ -162,17 +270,19 @@ def heur_smart_robots(state: SokobanState):
 
 
 times_called = [0]
+
+
 def heur_alternate(state: SokobanState):
     """a better heuristic
     INPUT: a sokoban state
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
     global times_called
     times_called[0] += 1
-    # if times_called[0] > 100000:
-    #     state.print_state()
+    # if times_called[0] > 100000:  # for debugging, probably stuck on a dead state
+    # state.print_state()
 
     if is_dead_state(state):
-        return 99999999999
+        return float('inf')
 
     return heur_smart_robots(state)
 
@@ -237,13 +347,16 @@ def anytime_gbfs(initial_state, heur_fn, timebound=10):
     return False
 
 
+test_state = SokobanState("START", 0, None, 5, 5,  # dimensions
+                          ((2, 1), (2, 3)),  # robots
+                          frozenset(((1, 1), (4, 0))),  # (1, 3), (3, 1), (3, 3))), #boxes
+                          frozenset(((0, 0), (0, 4), (4, 0), (4, 4))),  # storage
+                          frozenset(((1, 0), (2, 0), (3, 0), (1, 4), (2, 4), (3, 4)))  # obstacles
+                          )
+
 if __name__ == "__main__":
-    s0 = PROBLEMS[5]
+    s0 = test_state  # PROBLEMS[0]
     print(s0.state_string())
-
     se = SearchEngine('best_first', 'full')
-    se.trace_on()
-
     se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
-
     final = se.search()
