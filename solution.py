@@ -9,7 +9,8 @@
 from search import *  # for search engines
 from sokoban import SokobanState, Direction, PROBLEMS  # for Sokoban specific classes and problems
 from sokoban import UP, DOWN, LEFT, RIGHT
-
+from os import times
+import random
 
 # ================================================= Utilities ======================================================
 def sokoban_goal_state(state):
@@ -168,6 +169,7 @@ def heur_manhattan_with_pruning(state: SokobanState):
             remaining_box.remove(box)
             remaining_stor.remove(box)
 
+    # remaining_box = tuple(remaining_box)
     for box in remaining_box:
 
         # check for dead state and don't look at any successors
@@ -189,6 +191,7 @@ def heur_manhattan_with_pruning(state: SokobanState):
     # looking at tests with and without checking for distance between robots and boxes, it seems like it is worth it to
     # check iff there are any obsticles, or there are 2 or fewer robots and 3 or fewer boxes
     if len(state.obstacles) > 0 or len(state.robots) <= 2 and len(state.boxes) <= 3:
+        # remaining_box = set(remaining_box)
         for robot in state.robots:
             if len(remaining_box) is 0:
                 break
@@ -237,7 +240,7 @@ def heur_zero(state):
 
 # ================================================ Anytime Algorithms ================================================
 
-def fval_function(sN, weight):
+def fval_function(sN: sNode, weight):
     """
     Provide a custom formula for f-value computation for Anytime Weighted A star.
     Returns the fval of the state contained in the sNode.
@@ -255,7 +258,7 @@ def fval_function(sN, weight):
     # must return a numeric f-value. The value will determine your state's position on the Frontier list during a
     # 'custom' search. You must initialize your search engine object as a 'custom' search engine if you supply a
     # custom fval function.
-    return 0
+    return (1-weight) * sN.state.gval + weight * sN.hval
 
 
 def anytime_weighted_astar(initial_state, heur_fn, weight=1., timebound=10):
@@ -274,8 +277,15 @@ def anytime_gbfs(initial_state, heur_fn, timebound=10):
     OUTPUT: A goal state (if a goal is found), else False
     implementation of weighted astar algorithm"""
 
-    # IMPLEMENT
-    return False
+    curr_best = False
+    start_time = times()[0]
+    se = SearchEngine()
+    running_time = 0
+    while running_time < timebound:
+
+        running_time = times()[0] - start_time
+
+    return curr_best
 
 
 test_state = SokobanState("START", 0, None, 5, 5,  # dimensions
@@ -286,8 +296,9 @@ test_state = SokobanState("START", 0, None, 5, 5,  # dimensions
                           )
 
 if __name__ == "__main__":
-    s0 = test_state  # PROBLEMS[0]
+    s0 = PROBLEMS[3]
     print(s0.state_string())
     se = SearchEngine('best_first', 'full')
+    se.trace_on()
     se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
     final = se.search()

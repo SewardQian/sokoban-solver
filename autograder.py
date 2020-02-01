@@ -72,7 +72,7 @@ if test_alternate:
     solved = 0
     unsolved = []
     benchmark = 12
-    timebound = 8  # time limit
+    timebound = 10  # time limit
     output = [20, 5, 29, 12, 13, -99, 18, 41, 16, -99, 42, 38, -99, 43, 37, -99, -99, -99, -99, -99]
     time_totals = []
     heur_calls = []
@@ -87,14 +87,14 @@ if test_alternate:
 
         times_called[0] = 0
         se = SearchEngine('best_first', 'full')
-        se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
+        se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate, fval_function=lambda sN: fval_function(sN, 1))
         final = se.search(timebound)
         print(f"heuristic was called {times_called[0]} times")
         time_totals.append(os.times()[0] - se.search_start_time)
         heur_calls.append(times_called[0])
         if final:
             # final.print_path()
-            my_print_path(final)
+            # my_print_path(final)
             solved += 1
         else:
             unsolved.append(i)

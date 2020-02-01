@@ -390,18 +390,18 @@ class SearchEngine:
         #BEGIN TRACING
         if self.trace:
             print("   TRACE: Initial OPEN: ", self.open.print_open())
-            if self.cycle_check == _CC_FULL:
-                print("   TRACE: Initial CC_Dict:", self.cc_dictionary)
+            # if self.cycle_check == _CC_FULL:
+            #     print("   TRACE: Initial CC_Dict:", self.cc_dictionary)
         #END TRACING
         while not self.open.empty():
             node = self.open.extract()
 
             #BEGIN TRACING
             if self.trace:
-                print("   TRACE: Next State to expand: <S{}:{}:{}, g={}, h={}, f=g+h={}>".format(
-                    node.state.index, node.state.action, node.state.hashable_state(), node.gval, node.hval, node.gval + node.hval))
-                if node.state.gval != node.gval:
-                    print("ERROR: Node gval not equal to state gval!")
+                print("   TRACE: Next State to expand: <S{}:{}, g={}, h={}>".format(
+                    node.state.index, node.state.action, node.gval, node.hval))
+                # if node.state.gval != node.gval:
+                #     print("ERROR: Node gval not equal to state gval!")
             #END TRACING
                         
             if goal_fn(node.state):
@@ -422,9 +422,9 @@ class SearchEngine:
              #node's current g-value. 
 
             #BEGIN TRACING
-            if self.trace:
-                if self.cycle_check == _CC_FULL: print("   TRACE: CC_dict gval={}, node.gval={}".format(
-                    self.cc_dictionary[node.state.hashable_state()], node.gval))
+            # if self.trace:
+            #     if self.cycle_check == _CC_FULL: print("   TRACE: CC_dict gval={}, node.gval={}".format(
+            #         self.cc_dictionary[node.state.hashable_state()], node.gval))
             #END TRACING
 
             if self.cycle_check == _CC_FULL and self.cc_dictionary[node.state.hashable_state()] < node.gval:
@@ -436,8 +436,8 @@ class SearchEngine:
             if self.trace:
                 print("   TRACE: Expanding Node. Successors = {", end="")
                 for ss in successors:                  
-                    print("<S{}:{}:{}, g={}, h={}, f=g+h={}>, ".format(
-                        ss.index, ss.action, ss.hashable_state(), ss.gval, heur_fn(ss), ss.gval+heur_fn(ss)), end="")                    
+                    print("<S{}:{}, g={}, h={}>, ".format(
+                        ss.index, ss.action, ss.gval, heur_fn(ss)), end="")
                 print("}")
             #END TRACING
 
