@@ -155,6 +155,9 @@ def heur_manhattan_distance(state: SokobanState):
     return total
 
 def heur_manhattan_with_pruning(state: SokobanState):
+    """assign each box to its closest storage point and calculate total distance. Storage points already claimed by
+    another box are not considered"""
+
     remaining_stor = set(state.storage)
     remaining_box = set(state.boxes)
     total = 0

@@ -94,7 +94,7 @@ if test_alternate:
         heur_calls.append(times_called[0])
         if final:
             # final.print_path()
-            # my_print_path(final)
+            my_print_path(final)
             solved += 1
         else:
             unsolved.append(i)
