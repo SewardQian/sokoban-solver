@@ -74,6 +74,8 @@ if test_alternate:
     benchmark = 12
     timebound = 8  # time limit
     output = [20, 5, 29, 12, 13, -99, 18, 41, 16, -99, 42, 38, -99, 43, 37, -99, -99, -99, -99, -99]
+    time_totals = []
+    heur_calls = []
     for i in range(0, len(PROBLEMS)):
 
         print("*************************************")
@@ -88,21 +90,33 @@ if test_alternate:
         se.init_search(s0, goal_fn=sokoban_goal_state, heur_fn=heur_alternate)
         final = se.search(timebound)
         print(f"heuristic was called {times_called[0]} times")
+        time_totals.append(os.times()[0] - se.search_start_time)
+        heur_calls.append(times_called[0])
         if final:
             # final.print_path()
-            my_print_path(final)
+            # my_print_path(final)
             solved += 1
         else:
             unsolved.append(i)
 
     print("\n*************************************")
-    print("Of {} initial problems, {} were solved in less than {} seconds by this solver.".format(len(PROBLEMS), solved,
+    print("Of {} problems, {} were solved in less than {} seconds by this solver.".format(len(PROBLEMS), solved,
                                                                                                   timebound))
-    print("Problems that remain unsolved in the set are Problems: {}".format(unsolved))
-    print("The benchmark implementation solved {} out of {} practice problems given {} seconds.".format(benchmark,
-                                                                                                        len(PROBLEMS),
-                                                                                                        timebound))
-    print("*************************************\n")
+    # print("Problems that remain unsolved in the set are Problems: {}".format(unsolved))
+    # print("The benchmark implementation solved {} out of {} practice problems given {} seconds.".format(benchmark,
+    #                                                                                                     len(PROBLEMS),
+    #                                                                                                     timebound))
+    print("Times and heuristic calls for each test case were as follows:\n\n")
+    print(" Problem  Num | Solve Time (s) | States Explored ")
+    print("—————————————————————————————————————————————————")
+    for i in range(len(time_totals)):
+        time_str = ""
+        if time_totals[i] < timebound:
+            time_str = f"{time_totals[i]:.2f}"
+        else:
+            time_str = " -- "
+        print(f"  Problem {' ' if i < 10 else ''}{i}  |      {time_str}      |     {heur_calls[i]}")
+    print("\n\n*************************************\n")
     ##############################################################
 
 if test_fval_function:

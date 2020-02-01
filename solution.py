@@ -57,19 +57,28 @@ def is_immovable(pos, state):
 
 
 def _is_immov(pos, state: SokobanState, visited: set):
+    _pos = tuple(pos)
     # if the position is an obstacle or boundry it is immovable
     # if this pos is already in visited then there is a box at this position that is deadlocked with another box
-    if pos in state.obstacles or is_oob(pos, state) or pos in visited:
+    if _pos in state.obstacles or is_oob(_pos, state) or _pos in visited:
         return True
-    elif pos not in state.boxes:  # not an obsticle or box, then position is not dead
+    elif _pos not in state.boxes:  # not an obsticle or box, then position is not dead
         return False
 
-    corners = [(DOWN, LEFT), (LEFT, UP), (UP, RIGHT), (RIGHT, DOWN)]
-    visited.add(pos)
+    visited.add(_pos)
 
-    for d1, d2 in corners:
-        if _is_immov(d1.move(pos), state, visited) and _is_immov(d2.move(pos), state, visited):
-            return True
+    up = _is_immov(UP.move(_pos), state, visited)
+    down = _is_immov(DOWN.move(_pos), state, visited)
+    if not up and not down:
+        return False
+
+    left = _is_immov(LEFT.move(_pos), state, visited)
+    if (up and left) or (down and left):
+        return True
+
+    right = _is_immov(RIGHT.move(_pos), state, visited)
+    if (down and right) or (up and right):
+        return True
     return False
 
 
@@ -91,49 +100,30 @@ def is_stuck(box, state: SokobanState):
     for wall_dir in (UP, DOWN, LEFT, RIGHT):
 
         found_plus_edge, found_minus_edge = False, False
-        plus_pos, minus_pos = box, box
+        plus_pos, minus_pos = [box[0], box[1]], [box[0], box[1]]
         plus_dir, minus_dir = cw_dir(wall_dir), ccw_dir(wall_dir)
 
         while not found_plus_edge:
 
-            if plus_pos in state.storage or not is_immovable(wall_dir.move(plus_pos), state):
+            if tuple(plus_pos) in state.storage or not is_immovable(wall_dir.move(plus_pos), state):
                 return False
             else:
                 if is_immovable(plus_pos, state):
                     found_plus_edge = True
 
-            plus_pos = plus_dir.move(plus_pos)
+            ladd2(plus_pos, plus_dir.delta)
 
         while not found_minus_edge:
 
-            if minus_pos in state.storage or not is_immovable(wall_dir.move(minus_pos), state):
+            if tuple(minus_pos) in state.storage or not is_immovable(wall_dir.move(minus_pos), state):
                 return False
             else:
                 if is_immovable(minus_pos, state):
                     found_minus_edge = True
 
-            minus_pos = minus_dir.move(minus_pos)
+            ladd2(minus_pos, minus_dir.delta)
 
         return found_plus_edge and found_minus_edge
-
-        # while (box[0] + i < state.width and box[1]  < state.height
-        #        and not found_plus_edge and not found_minus_edge):
-        #
-        #     if not found_plus_edge:
-        #         plus_wall = tadd(box, tmul(i, wall_dir.delta))
-        #         if plus_wall in state.storage:
-        #             return False
-        #         if is_immovable(plus_wall, state):
-        #             found_plus_edge = True
-        #
-        #     if not found_minus_edge:
-        #         minus_pos = tadd(box, tmul(-i, wall_dir.delta))
-        #         if minus_pos in state.storage:
-        #             return False
-        #         if is_immovable(minus_pos, state):
-        #             pass
-        #
-        #     i += 1
 
 
 def cw_dir(dir: Direction):
@@ -162,6 +152,11 @@ def ccw_dir(dir: Direction):
         return UP
     else:
         assert False
+
+
+def ladd2(iter1, iter2):
+    iter1[0] += iter2[0]
+    iter1[1] += iter2[1]
 
 
 def tadd(tup1, tup2):
@@ -218,6 +213,9 @@ def heur_smart_robots(state: SokobanState):
         if box in state.storage:
             continue
 
+        if is_immovable(box, state) or is_stuck(box, state):
+            return float('inf')
+
         # calculate distance and direction box needs to move, and find closest robot to move box
         box_signed_dst = calc_manhattan_tup(box, min(state.storage, key=lambda x: calc_manhattan(box, x)))
         closest_robot = min(state.robots, key=lambda x: calc_manhattan(box, x))
@@ -269,6 +267,55 @@ def heur_smart_robots(state: SokobanState):
     return total
 
 
+def heur_manhattan_with_pruning(state: SokobanState):
+    remaining_stor = set(state.storage)
+    remaining_box = set(state.boxes)
+    total = 0
+
+    # don't consider any boxes that are already in a storage position
+    for box in state.boxes:
+        if box in remaining_stor:
+            remaining_box.remove(box)
+            remaining_stor.remove(box)
+
+    for box in remaining_box:
+
+        # check for dead state and don't look at any successors
+        if is_immovable(box, state) or is_stuck(box, state):
+            return float('inf')
+
+        # check distance between box and closest storage point that hasn't been "claimed" so far
+        min_dst = float('inf')
+        target = None
+        for stor in remaining_stor:
+            d = calc_manhattan(box, stor)
+            if d < min_dst:
+                min_dst = d
+                target = stor
+
+        total += min_dst
+        remaining_stor.remove(target)
+
+    # looking at tests with and without checking for distance between robots and boxes, it seems like it is worth it to
+    # check iff there are any obsticles, or there are 2 or fewer robots and 3 or fewer boxes
+    if len(state.obstacles) > 0 or len(state.robots) <= 2 and len(state.boxes) <= 3:
+        for robot in state.robots:
+            if len(remaining_box) is 0:
+                break
+            min_dst = float('inf')
+            target = None
+            for box in remaining_box:
+                d = calc_manhattan(robot, box)
+                if d < min_dst:
+                    min_dst = d
+                    target = box
+
+            total += min_dst
+            remaining_box.remove(target)
+
+    return total
+
+
 times_called = [0]
 
 
@@ -278,12 +325,8 @@ def heur_alternate(state: SokobanState):
     OUTPUT: a numeric value that serves as an estimate of the distance of the state to the goal."""
     global times_called
     times_called[0] += 1
-    # if times_called[0] > 100000:  # for debugging, probably stuck on a dead state
-    # state.print_state()
 
-    if is_dead_state(state):
-        return float('inf')
-
+    # return heur_manhattan_with_pruning(state)
     return heur_smart_robots(state)
 
 
